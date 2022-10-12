@@ -1,0 +1,16 @@
+= ShopList Test API
+
+[[get-board-list]]
+=== 게시판 목록
+
+==== Request fields
+include::{snippets}/board/path-parameters.adoc[]
+
+==== Response fields
+include::{snippets}/board/response-fields.adoc[]
+
+==== HTTP request
+include::{snippets}/board/http-request.adoc[]
+
+==== HTTP Response
+include::{snippets}/board/http-response.adoc[]
