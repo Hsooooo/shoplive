@@ -15,7 +15,10 @@ import com.test.shoplive.api.common.exception.ErrorCode;
 import com.test.shoplive.aws.service.S3Service;
 import lombok.RequiredArgsConstructor;
 import org.modelmapper.ModelMapper;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -29,6 +32,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -40,11 +44,13 @@ public class BoardServiceImpl implements BoardService {
     private final BoardImageRepository boardImageRepository;
     private final BoardImageCustomRepository boardImageCustomRepository;
     private final ModelMapper modelMapper;
+    private final CacheManager cacheManager;
 
     private final S3Service s3Service;
     @CacheEvict(cacheNames = "boardList", allEntries = true)
     @Override
     @Transactional
+    @CachePut(cacheNames = "userBoard", key = "#boardVO.userId")
     public Board addBoard(BoardAdd.Request boardVO, List<MultipartFile> files) throws Exception {
         if (files != null && files.size() > 2) {
             throw new BoardException(ErrorCode.Board.B003);
@@ -60,7 +66,6 @@ public class BoardServiceImpl implements BoardService {
         }
         return board;
     }
-
     @Override
     @Cacheable(cacheNames = "boardDetail", key = "#boardId")
     public BoardDetailItem.Response getBoard(Long boardId) throws Exception {
@@ -183,13 +188,17 @@ public class BoardServiceImpl implements BoardService {
 
         }
     }
-
     private boolean isAbuseWriteBoard(String userId) {
-        Board board = boardCustomRepository.findBoardByUserIdRecently(userId);
-        if (board == null) {
+        Cache boardCache = cacheManager.getCache("userBoard");
+        if (boardCache == null){
             return false;
+        } else {
+            Board board = boardCache.get(userId, Board.class);
+            if (board == null) {
+                return false;
+            } else {
+                return board.getUserId().equals(userId);
+            }
         }
-        LocalDateTime recentlyCreateDt = board.getCreateDt();
-        return recentlyCreateDt.plusSeconds(60).isAfter(LocalDateTime.now());
     }
 }
